@@ -2,7 +2,7 @@
 
 ## Usage
 
-	txt
+	txtz [-c] [-d] < [input] > [output]
 
 ## Archive format
 
@@ -12,10 +12,10 @@ The archive file is binary and consists of an index of characters and their posi
 
 such as:
 
-	2 a 0 3
-	3 Z 9 212 9087
-	2 ß 31 123121
-	4 д 2 32 57 86545
+	\0\0 2 a 0 3
+	\0\0 3 Z 9 212 9087
+	\0\0 2 ß 31 123121
+	\0\0 4 д 2 32 57 86545
 
 The runes are valid utf-8 and the positions are uint8 integers.
 

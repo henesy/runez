@@ -87,16 +87,10 @@ func Compress(r *bufio.Reader, w *bufio.Writer) {
 			fmt.Fprintf(os.Stderr, "%q has %v locations\n", r, l.Len())
 		}
 
-		// Null byte preamble
-		_, err := w.Write([]byte{0})
-		if err != nil {
-			fatal("err: could not write null byte - ", err)
-		}
-
 		// Position count
 		pc := byte(uint8(l.Len()))
 
-		err = binary.Write(w, binary.LittleEndian, pc)
+		err := binary.Write(w, binary.LittleEndian, pc)
 		if err != nil {
 			fatal("err: could not write position count - ", err)
 		}
@@ -126,27 +120,15 @@ func Decompress(r *bufio.Reader, w *bufio.Writer) {
 
 	// Populate lists by reading all definitions
 	for {
-		// Read out null preamble
-		var null byte
+		// Read out position count
+		var pc uint8
 
-		err := binary.Read(r, binary.LittleEndian, &null)
+		err := binary.Read(r, binary.LittleEndian, &pc)
 		if err != nil {
 			if err == io.EOF {
 				break
 			}
 
-			fatal("err: could not read null preamble - ", err)
-		}
-
-		if null != byte(0) {
-			fatal("err: unexpected non-null byte at beginning of entry -", null)
-		}
-
-		// Read out position count
-		var pc uint8
-
-		err = binary.Read(r, binary.LittleEndian, &pc)
-		if err != nil {
 			fatal("err: could not read position count - ", err)
 		}
 

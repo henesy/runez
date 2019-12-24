@@ -6,22 +6,18 @@
 
 ## Archive format
 
-The archive file is binary and consists of an index of characters and their positions starting from 0 packed in the form:
+The archive file is little-endian binary and consists of an index of characters and their positions starting from 0 packed in the form:
 
-	[null][null][uint8 # positions][rune][uint8 position(s)…]
+	[null][uint8 # positions][rune][uint8 position(s)…]
 
 such as:
 
-	\0\0 2 a 0 3
-	\0\0 3 Z 9 212 9087
-	\0\0 2 ß 31 123121
-	\0\0 4 д 2 32 57 86545
+	\0 2 a 0 3
+	\0 3 Z 9 212 9087
+	\0 2 ß 31 123121
+	\0 4 д 2 32 57 86545
 
 The runes are valid utf-8 and the positions are uint8 integers.
-
-Two nulls are used so null characters may be compressed.
-
-When a null is encountered, the decompressor should read ahead one rune to check for a second null and start a new rune entry if a second null is found.
 
 ## Algorithm
 

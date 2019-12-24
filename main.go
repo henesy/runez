@@ -1,13 +1,14 @@
 package main
 
 import (
+	"fmt"
 	"bufio"
 	"os"
 	"io"
-	"log"
 	"flag"
 	"container/list"
 //	"sort"
+	"encoding/binary"
 )
 
 
@@ -23,7 +24,7 @@ func main() {
 	}
 
 	if *c == *d {
-		log.Fatal("err: choose one explicit mode")
+		fatal("err: choose one explicit mode")
 	}
 
 	in := bufio.NewReader(os.Stdin)
@@ -44,29 +45,63 @@ func Compress(r *bufio.Reader, w *bufio.Writer) {
 	dict := make(map[rune]*list.List)
 
 	// Build table
-	for i := uint8(0); ; i++ {
+	for i := 0; ; i++ {
 		r, _, err := r.ReadRune()
 		if err != nil {
 			if err == io.EOF {
 				break
 			}
 
-			log.Fatal("err: could not read rune - ", err)
+			fatal("err: could not read rune - ", err)
 		}
 
 		if dict[r] == nil {
 			dict[r] = list.New()
 		}
 
-		dict[r].PushFront(i)
+		// Check for character count overflow
+		if max := int(^uint8(0)); i > max {
+			fatal("err: too many characters to compress, stopped at: ", max)
+		}
+
+		dict[r].PushFront(uint8(i))
 	}
 
 	// Iterate dict to emit output file format
 	for r, l := range dict {
-		log.Printf("%c has %v locations", r, l.Len())
+		// DEBUG
+		fmt.Fprintf(os.Stderr, "%q has %v locations\n", r, l.Len())
+
+		// Null byte preamble
+		_, err := w.Write([]byte{0})
+		if err != nil {
+			fatal("err: could not write null byte - ", err)
+		}
+
+		// Position count
+		pc := byte(uint8(l.Len()))
+
+		err = binary.Write(w, binary.LittleEndian, pc)
+		if err != nil {
+			fatal("err: could not write position count - ", err)
+		}
+
+		// Rune
+		err = binary.Write(w, binary.LittleEndian, []byte(string(r)))
+		if err != nil {
+			fatal("err: could not write rune - ", err)
+		}
+
+		// Positions
+		for p := l.Front(); p != nil; p = p.Next() {
+			err := binary.Write(w, binary.LittleEndian, byte(p.Value.(uint8)))
+			if err != nil {
+				fatal("err: could not write position - ", err)
+			}
+		}
 	}
 
-	log.Println(dict)
+	w.Flush()
 }
 
 // Decompress the archive format to text
@@ -78,4 +113,10 @@ func Decompress(r *bufio.Reader, w *bufio.Writer) {
 	// Sort slice using "sort" for uint8
 
 	// Emit file in order of uint8 positions
+}
+
+// Fatal - end program with an error message and newline
+func fatal(s ...interface{}) {
+	fmt.Fprintln(os.Stderr, s...)
+	os.Exit(1)
 }

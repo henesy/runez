@@ -1,12 +1,10 @@
-# Txtz Specification
+# Runez Specification
 
-## Usage
-
-	txtz [-c] [-d] < [input] > [output]
+The file extension for a runez archive is `.rz`.
 
 ## Archive format
 
-The archive file is little-endian binary and consists of an index of characters and their positions starting from 0 packed in the form:
+The archive file is little-endian binary and consists of an index of utf-8 characters (runes) and their positions starting from 0 packed in the form:
 
 	[null][uint8 # positions][rune][uint8 position(s)…]
 
@@ -23,16 +21,17 @@ The runes are valid utf-8 and the positions are uint8 integers.
 
 The general conversion looks like:
 
-	The quick brown fox
+	αβξαβξ
 
 to
 
-	==> TODO
+	\02α03
+	\02β14
+	\02ξ25
 
 ## Restrictions
 
 We assume:
 
 - The whole file is read into memory
-- There are no more than uint8 characters
-
+- There are no more than `^uint8(0)` runes

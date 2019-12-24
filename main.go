@@ -1,25 +1,40 @@
 package main
 
 import (
-	"fmt"
 	"bufio"
-	"os"
-	"io"
-	"flag"
 	"container/list"
-//	"sort"
 	"encoding/binary"
+	"flag"
+	"fmt"
+	"io"
+	"os"
+	"sort"
 )
 
+// Encodes a rune and a position for decompression
+type Pair struct {
+	R rune
+	P uint8
+}
 
-// Naive text compression/decompression program
+// For "sort"
+type ByPosition []Pair
+
+func (a ByPosition) Len() int           { return len(a) }
+func (a ByPosition) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
+func (a ByPosition) Less(i, j int) bool { return a[i].P < a[j].P }
+
+var chatty bool
+
+// Naive utf-8 text compression/decompression program
 func main() {
 	c := flag.Bool("c", false, "Explicit compress mode")
 	d := flag.Bool("d", false, "De-compress mode")
+	flag.BoolVar(&chatty, "D", false, "Chatty debug mode")
 	flag.Parse()
 
 	// Compress by default
-	if (! *c) && (! *d) {
+	if (!*c) && (!*d) {
 		*c = true
 	}
 
@@ -38,7 +53,6 @@ func main() {
 		Decompress(in, out)
 	}
 }
-
 
 // Compress text to the archive format
 func Compress(r *bufio.Reader, w *bufio.Writer) {
@@ -69,8 +83,9 @@ func Compress(r *bufio.Reader, w *bufio.Writer) {
 
 	// Iterate dict to emit output file format
 	for r, l := range dict {
-		// DEBUG
-		fmt.Fprintf(os.Stderr, "%q has %v locations\n", r, l.Len())
+		if chatty {
+			fmt.Fprintf(os.Stderr, "%q has %v locations\n", r, l.Len())
+		}
 
 		// Null byte preamble
 		_, err := w.Write([]byte{0})
@@ -87,7 +102,7 @@ func Compress(r *bufio.Reader, w *bufio.Writer) {
 		}
 
 		// Rune
-		err = binary.Write(w, binary.LittleEndian, []byte(string(r)))
+		err = binary.Write(w, binary.LittleEndian, r)
 		if err != nil {
 			fatal("err: could not write rune - ", err)
 		}
@@ -106,13 +121,81 @@ func Compress(r *bufio.Reader, w *bufio.Writer) {
 
 // Decompress the archive format to text
 func Decompress(r *bufio.Reader, w *bufio.Writer) {
-	//dict := make(map[rune]*list.List)
+	dict := make(map[rune][]uint8)
+	sum := 0
 
-	// Turn lists → slice of {rune, uint8}
+	// Populate lists by reading all definitions
+	for {
+		// Read out null preamble
+		var null byte
 
-	// Sort slice using "sort" for uint8
+		err := binary.Read(r, binary.LittleEndian, &null)
+		if err != nil {
+			if err == io.EOF {
+				break
+			}
+
+			fatal("err: could not read null preamble - ", err)
+		}
+
+		if null != byte(0) {
+			fatal("err: unexpected non-null byte at beginning of entry -", null)
+		}
+
+		// Read out position count
+		var pc uint8
+
+		err = binary.Read(r, binary.LittleEndian, &pc)
+		if err != nil {
+			fatal("err: could not read position count - ", err)
+		}
+
+		// Read out rune
+		var ru rune
+
+		err = binary.Read(r, binary.LittleEndian, &ru)
+		if err != nil {
+			fatal("err: could not read rune - ", err)
+		}
+
+		dict[ru] = make([]uint8, pc)
+		sum += int(pc)
+
+		if chatty {
+			fmt.Fprintf(os.Stderr, "%q has %v locations\n", ru, pc)
+		}
+
+		// Read positions into slice
+		for i := uint8(0); i < pc; i++ {
+			var p uint8
+
+			err = binary.Read(r, binary.LittleEndian, &p)
+			if err != nil {
+				fatal("err: could not read position #", i, "-", err)
+			}
+
+			dict[ru][i] = p
+		}
+	}
+
+	// Merge slices
+	master := make([]Pair, 0, sum)
+
+	for ru, s := range dict {
+		for _, p := range s {
+			master = append(master, Pair{ru, p})
+		}
+	}
+
+	// Sort super slice using "sort" for uint8
+	sort.Sort(ByPosition(master))
 
 	// Emit file in order of uint8 positions
+	for _, pair := range master {
+		w.Write([]byte(string(pair.R)))
+	}
+
+	w.Flush()
 }
 
 // Fatal - end program with an error message and newline

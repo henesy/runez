@@ -28,7 +28,7 @@ Compressing some text in Macedonian:
 	355 mac.txt
 	; ./runez < mac.txt > out.rz
 	; wc -c out.rz
-	309 out.rz
+	290 out.rz
 	; ./runez -d < out.rz > newmac.txt
 	; diff mac.txt newmac.txt
 	;
